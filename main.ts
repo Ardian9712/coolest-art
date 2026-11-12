@@ -1,7 +1,8 @@
-// coolest-art-01 entry: the art is entry.png beside this file — a glowing whale
-// drifting through a starlit night sky above a sleeping city, lanterns and a full
-// moon below it. This program places that single PNG at /output/entry.png so the
-// sealed gate reads exactly these bytes. Node 22, standard library only.
+// coolest-art-01 entry: the art is entry.png beside this file — a giant glowing
+// whale flying through a starlit night sky, a small astronaut riding on its back
+// holding a lantern, a full moon above and a sleeping city with its lanterns
+// below. This program places that single PNG at /output/entry.png so the sealed
+// gate reads exactly these bytes. Node 22, standard library only.
 //
 // Outside the grader's container MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -23,6 +24,19 @@ function outputDirectory(): string {
   return process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 }
 
+// The gate tells a PNG from a JPEG by its first bytes and takes nothing else,
+// so an entry must begin with one of these two magic numbers.
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
+
+function hasImageSignature(bytes: Buffer): boolean {
+  const startsWithPng =
+    bytes.length >= PNG_SIGNATURE.length && bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
+  const startsWithJpeg =
+    bytes.length >= JPEG_SIGNATURE.length && bytes.subarray(0, JPEG_SIGNATURE.length).equals(JPEG_SIGNATURE);
+  return startsWithPng || startsWithJpeg;
+}
+
 function main(): void {
   // Guard: without the artwork there is nothing to enter, so say so and stop
   // rather than writing a truncated or empty file the gate would refuse.
@@ -41,6 +55,17 @@ function main(): void {
   if (imageBytes.byteLength > MAX_BYTES) {
     console.error(
       `entry too large: ${imageBytes.byteLength} bytes, limit is ${MAX_BYTES} (1 MiB) — shrink ${ARTWORK_PATH}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  // Format guard: the entry must be a whole PNG or JPEG, told apart by its
+  // first bytes. Anything else is refused here, before any byte is written,
+  // so a stray non-image file never reaches the output directory at all.
+  if (!hasImageSignature(imageBytes)) {
+    console.error(
+      `entry is not a PNG or JPEG: ${ARTWORK_PATH} does not start with a valid image signature`,
     );
     process.exitCode = 1;
     return;
